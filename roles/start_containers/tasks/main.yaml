@@ -1,0 +1,26 @@
+- name: Create the remote_tmp directory for Ansible with correct permissions
+  file:
+    path: /home/fadhil/.ansible/tmp
+    state: directory
+    mode: "0777"
+    owner: fadhil
+    group: fadhil
+
+- name: include variable files
+  include_vars: vars/project-vars
+
+- name: copy docker compose file
+  copy:
+    src: docker-compose.yaml
+    dest: /home/fadhil/docker-compose.yaml
+
+- name: docker login
+  docker_login:
+    registry_url: https://registry-1.docker.io/v2/
+    username: "{{docker_username}}"
+    password: "{{docker_password}}"
+
+- name: start docker-compose file
+  community.docker.docker_compose_v2:
+    project_src: /home/fadhil
+    state: present

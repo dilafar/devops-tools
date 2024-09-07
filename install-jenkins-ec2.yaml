@@ -1,0 +1,90 @@
+---
+- name: Install Java and Net-Tools
+  hosts: jenkins_server
+  become: yes
+  tasks:
+    - name: Install net-tools
+      yum:
+        name: fontconfig
+        update_cache: yes
+        state: present
+    - name: Install Amazon Corretto 17
+      yum:
+        name: java-17-amazon-corretto-devel
+        update_cache: yes
+        state: present
+    - name: Install net-tools
+      yum:
+        name: net-tools
+        state: present
+
+- name: Install Jenkins and Dependencies
+  hosts: jenkins_server
+  become: yes
+  tasks:
+    - name: Install Jenkins repo
+      get_url:
+        url: https://pkg.jenkins.io/redhat-stable/jenkins.repo
+        dest: /etc/yum.repos.d/jenkins.repo
+    - name: Import Jenkins RPM key
+      rpm_key:
+        state: present
+        key: https://pkg.jenkins.io/redhat-stable/jenkins.io-2023.key
+    - name: Install EPEL repository
+      command: amazon-linux-extras install epel -y
+    - name: Upgrade all packages
+      yum:
+        name: "*"
+        state: latest
+    - name: Install Jenkins
+      yum:
+        name: jenkins
+        update_cache: yes
+        state: present
+    - name: Install Docker
+      yum:
+        name: docker
+        state: present
+    - name: Check if nvm is installed
+      stat:
+        path: ~/.nvm
+      register: stat_result
+    - name: Download nvm installer script
+      get_url:
+        url: https://raw.githubusercontent.com/nvm-sh/nvm/v0.39.3/install.sh
+        dest: /tmp/install.sh
+      when: not stat_result.stat.exists
+    - name: Install nvm
+      shell: bash /tmp/install.sh
+      when: not stat_result.stat.exists
+    - name: Install Node.js
+      shell: |
+        source /root/.nvm/nvm.sh
+        nvm install 14.18.0
+        node --version
+      args:
+        executable: /bin/bash
+      register: cmd_result
+    - debug:
+        msg: "{{ cmd_result }}"
+
+- name: Monitor Jenkins
+  hosts: jenkins_server
+  become: yes
+  tasks:
+    - name: Reload systemd
+      systemd_service:
+        daemon_reload: true
+    - name: Enable and start jenkins
+      systemd_service:
+        name: jenkins
+        state: started
+        enabled: true
+    - name: Wait 10 seconds to ensure Jenkins is up
+      pause:
+        seconds: 10
+    - name: Check Jenkins status with netstat
+      command: netstat -plnt
+      register: jenkins_status
+    - debug:
+        msg: "{{ jenkins_status.stdout }}"

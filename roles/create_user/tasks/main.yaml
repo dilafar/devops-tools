@@ -1,0 +1,4 @@
+- name: create user
+  user:
+    name: fadhil
+    groups: adm , docker
