@@ -3,15 +3,16 @@
   hosts: nexus_server
   become: yes
   tasks:
-    - name: update apt repo and cache
-      yum:
+    - name: update packages
+      apt:
         update_cache: yes
+        cache_valid_time: 3600
     - name: install java jdk 17
-      yum:
-        name: java-17-amazon-corretto-devel
+      apt:
+        name: openjdk-17-jdk
         state: present
     - name: install net-tools
-      yum:
+      apt:
         name: net-tools
         state: present
 
@@ -25,14 +26,14 @@
         dest: /opt/
       register: download_url
     - debug:
-        msg: "{{download_url}}"
+        msg: "{{ download_url }}"
     - name: ensure nexus folder is already created
       stat:
         path: /opt/nexus
       register: nexus_stat
     - name: unarchive nexus file
       unarchive:
-        src: "{{download_url.dest}}"
+        src: "{{ download_url.dest }}"
         dest: /opt/
         remote_src: yes
       when: not nexus_stat.stat.exists
@@ -43,7 +44,7 @@
         file_type: directory
       register: nexus_folder
     - name: mv nexus
-      shell: mv {{nexus_folder.files[0].path}} /opt/nexus
+      shell: mv {{ nexus_folder.files[0].path }} /opt/nexus
       when: not nexus_stat.stat.exists
 
 - name: create user nexus and assign permission
@@ -72,19 +73,16 @@
         owner: nexus
         group: nexus
         recurse: yes
-    - name: change run as user to nexus
-      lineinfile:
-        path: /opt/nexus/bin/nexus.rc
-        regexp: '^#run_as_user=""'
-        line: run_as_user="nexus"
+    - name: Create Nexus systemd service file
+      template:
+        src: templates/nexus.service.j2
+        dest: /etc/systemd/system/nexus.service
+        mode: "a+x"
+      notify:
+        - Reload systemd
+        - Enable and start Nexus service
 
-- name: create user nexus and assign permission
-  hosts: nexus_server
-  become: yes
-  become_user: nexus
-  tasks:
-    - name: start nexus
-      command: /opt/nexus/bin/nexus start
+  handlers:
     - name: Reload systemd
       systemd_service:
         daemon_reload: true
@@ -93,7 +91,7 @@
         name: nexus
         state: started
         enabled: true
-   
+        
 - name: Verify nexus running
   hosts: nexus_server
   tasks:
@@ -101,12 +99,14 @@
       shell: ps aux | grep nexus
       register: app_status
     - debug:
-        msg: "{{app_status.stdout_lines}}"
+        msg: "{{ app_status.stdout_lines }}"
     - name: wait one minute
       pause:
         minutes: 1
     - name: check with netstat
       shell: netstat -tulpena | grep nexus
       register: app_status
+      become: yes
     - debug:
-        msg: "{{app_status.stdout_lines}}"
+        msg: "{{ app_status }}"
+

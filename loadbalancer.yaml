@@ -1,0 +1,21 @@
+- name: Get AWS Load Balancer DNS
+  hosts: localhost
+  gather_facts: no
+  tasks:
+    - name: Execute AWS CLI command to get Elastic Beanstalk environment DNS
+      command: >
+        aws elbv2 describe-load-balancers --names dev-k8-master-nlb --query 'LoadBalancers[0].DNSName' --output text
+      register: eb_dns_output
+
+    - ansible.builtin.debug:
+                msg: "{{ eb_dns_output.stdout }}"
+    - name: loadbalancer url
+      set_fact:
+        NLB: "{{ eb_dns_output.stdout }}"
+
+- name: Get AWS Load Balancer DNS
+  hosts: localhost
+  gather_facts: no
+  tasks:
+    - ansible.builtin.debug:
+                msg: "{{ NLB }}"

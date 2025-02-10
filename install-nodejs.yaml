@@ -1,0 +1,54 @@
+---
+- name: install nodejs and npm
+  hosts: 44.201.236.217
+  become: yes
+  vars_files:
+    - vars/project-vars
+  tasks:
+    - name: update apt repo and cache
+      yum:
+        update_cache: yes
+    - name: Download and run NodeSource setup script
+      shell: "{{url}}"
+    - name: Install Node.js and npm
+      yum:
+        name: nodejs
+        state: present
+
+- name: create a new linux user for node app
+  hosts: 44.201.236.217
+  become: yes
+  vars_files:
+    - vars/project-vars
+  tasks:
+    - name: create linux user
+      user:
+        name: "{{user_name}}"
+        comment: adm fadhil
+        group: adm
+
+- name: deploy nodejs app
+  hosts: 44.201.236.217
+  become: True
+  become_user: fadhil
+  vars_files:
+    - vars/project-vars
+  tasks:
+    - name: unarchive file
+      unarchive:
+        src: nodejs-app-1.0.0.tgz
+        dest: "{{destination}}"
+    - name: install dependencies
+      npm:
+        path: "{{destination}}/package"
+    - name: start the application
+      command:
+        chdir: "{{destination}}/package/app"
+        cmd: node server
+      async: 1000
+      poll: 0
+    - name: Ensure app is running
+      shell: ps aux | grep node
+      register: app_status
+    - debug:
+        msg: "{{app_status.stdout_lines}}"
